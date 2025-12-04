@@ -19,3 +19,16 @@
 - Template duplication between full page and fragments.
 - Focus management after deletes (ensure next focusable target).
 
+## Accessibility verification
+
+### Keyboard testing
+- [Results from Tab navigation test]
+
+### Screen reader testing
+- [If available: what was announced when filtering?]
+
+### No-JS parity
+- [Confirmation that all features work without JavaScript]
+
+### 400 words bullet points
+

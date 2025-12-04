@@ -8,6 +8,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.pebbletemplates.pebble.PebbleEngine
 import java.io.StringWriter
+import storage.TaskStore
 
 /**
  * NOTE FOR NON-INTELLIJ IDEs (VSCode, Eclipse, etc.):
@@ -147,4 +148,42 @@ fun Route.taskRoutes() {
     // - GET /tasks/{id}/edit - Show edit form (dual-mode)
     // - POST /tasks/{id}/edit - Save edits with validation (dual-mode)
     // - GET /tasks/{id}/view - Cancel edit (HTMX only)
+    
+
+fun Routing.configureTaskRoutes(store: TaskStore = TaskStore()) {
+    get("/tasks") {
+        val tasks = store.getAll()  // Instance passed as param
+        // ...
+    }
 }
+
+}
+// Fragment endpoint for HTMX updates
+get("/tasks/fragment") {
+    val q = call.request.queryParameters["q"]?.trim().orEmpty()
+    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+    val tasks = store.search(q).map { it.toPebbleContext() }
+    val pageData = Page.paginate(tasks, currentPage = page, pageSize = 10)
+
+    val list = call.renderTemplate("tasks/_list.peb", mapOf("page" to pageData, "q" to q))
+    val pager = call.renderTemplate("tasks/_pager.peb", mapOf("page" to pageData, "q" to q))
+    val status = """<div id="status" hx-swap-oob="true">Updated: showing ${pageData.items.size} of ${pageData.totalItems} tasks</div>"""
+
+    call.respondText(list + pager + status, ContentType.Text.Html)
+}
+
+// Update existing GET /tasks to use pagination
+get("/tasks") {
+    val q = call.request.queryParameters["q"]?.trim().orEmpty()
+    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+    val tasks = store.search(q).map { it.toPebbleContext() }
+    val pageData = Page.paginate(tasks, currentPage = page, pageSize = 10)
+
+    val html = call.renderTemplate("tasks/index.peb", mapOf(
+        "page" to pageData,
+        "q" to q,
+        "title" to "Tasks"
+    ))
+    call.respondText(html, ContentType.Text.Html)
+}
+
