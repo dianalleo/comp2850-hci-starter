@@ -154,36 +154,51 @@ fun Routing.configureTaskRoutes(store: TaskStore = TaskStore()) {
     get("/tasks") {
         val tasks = store.getAll()  // Instance passed as param
         // ...
+        val q = call.request.queryParameters["q"]?.trim().orEmpty()
+        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+        val tasks = store.search(q).map { it.toPebbleContext() }
+        val pageData = Page.paginate(tasks, currentPage = page, pageSize = 10)
+
+        val html = call.renderTemplate("tasks/index.peb", mapOf(
+            "page" to pageData,
+            "q" to q,
+            "title" to "Tasks"
+        ))
+        call.respondText(html, ContentType.Text.Html)
+        }
+    
+    get("/tasks/fragment") {
+        val q = call.request.queryParameters["q"]?.trim().orEmpty()
+        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+        val tasks = store.search(q).map { it.toPebbleContext() }
+        val pageData = Page.paginate(tasks, currentPage = page, pageSize = 10)
+
+        val list = call.renderTemplate("tasks/_list.peb", mapOf("page" to pageData, "q" to q))
+        val pager = call.renderTemplate("tasks/_pager.peb", mapOf("page" to pageData, "q" to q))
+        val status = """<div id="status" hx-swap-oob="true">Updated: showing ${pageData.items.size} of ${pageData.totalItems} tasks</div>"""
+
+        call.respondText(list + pager + status, ContentType.Text.Html)
     }
+
 }
 
 }
 // Fragment endpoint for HTMX updates
-get("/tasks/fragment") {
-    val q = call.request.queryParameters["q"]?.trim().orEmpty()
-    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-    val tasks = store.search(q).map { it.toPebbleContext() }
-    val pageData = Page.paginate(tasks, currentPage = page, pageSize = 10)
-
-    val list = call.renderTemplate("tasks/_list.peb", mapOf("page" to pageData, "q" to q))
-    val pager = call.renderTemplate("tasks/_pager.peb", mapOf("page" to pageData, "q" to q))
-    val status = """<div id="status" hx-swap-oob="true">Updated: showing ${pageData.items.size} of ${pageData.totalItems} tasks</div>"""
-
-    call.respondText(list + pager + status, ContentType.Text.Html)
-}
 
 // Update existing GET /tasks to use pagination
-get("/tasks") {
-    val q = call.request.queryParameters["q"]?.trim().orEmpty()
-    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-    val tasks = store.search(q).map { it.toPebbleContext() }
-    val pageData = Page.paginate(tasks, currentPage = page, pageSize = 10)
 
-    val html = call.renderTemplate("tasks/index.peb", mapOf(
-        "page" to pageData,
-        "q" to q,
-        "title" to "Tasks"
-    ))
-    call.respondText(html, ContentType.Text.Html)
+
+/**
+ * Helper to paginate and map tasks for template rendering.
+ * Reduces code duplication in validation and filter routes.
+ */
+private fun paginateTasks(
+    store: TaskStore,
+    query: String,
+    page: Int
+): Page<Map<String, Any>> {
+    val tasks = store.search(query).map { it.toPebbleContext() }
+    return Page.paginate(tasks, currentPage = page, pageSize = 10)
 }
+
 
